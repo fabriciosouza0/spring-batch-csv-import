@@ -1,2 +1,1 @@
-# nest-clean-arch-boilerplate
-Boilerplate
+# Spring Batch CSV import
