@@ -12,9 +12,11 @@ spring:
     allow-bean-definition-overriding: true
     web-application-type: servlet
     banner-mode: off
-  batch:
-    job:
-      enabled: false
+  sql:
+    init:
+      mode: always
+      # Força a execução do script oficial de tabelas do Spring Batch para o Postgres
+      schema-locations: classpath:org/springframework/batch/core/schema-postgresql.sql
   servlet:
     multipart:
       max-file-size: 1024MB
