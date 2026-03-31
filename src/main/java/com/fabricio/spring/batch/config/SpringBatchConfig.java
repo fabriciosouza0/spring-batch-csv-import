@@ -4,20 +4,22 @@ import com.fabricio.spring.batch.entity.CustomerEntity;
 import com.fabricio.spring.batch.repository.CustomerJdbcRepository;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.builder.JobBuilder;
-import org.springframework.batch.core.launch.support.JobOperatorFactoryBean;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.infrastructure.item.data.RepositoryItemWriter;
 import org.springframework.batch.infrastructure.item.file.FlatFileItemReader;
+import org.springframework.batch.infrastructure.item.file.FlatFileParseException;
 import org.springframework.batch.infrastructure.item.file.LineMapper;
 import org.springframework.batch.infrastructure.item.file.mapping.BeanWrapperFieldSetMapper;
 import org.springframework.batch.infrastructure.item.file.mapping.DefaultLineMapper;
 import org.springframework.batch.infrastructure.item.file.transform.DelimitedLineTokenizer;
+import org.springframework.batch.infrastructure.item.support.SynchronizedItemStreamReader;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.task.SimpleAsyncTaskExecutor;
+import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
@@ -33,14 +35,20 @@ public class SpringBatchConfig {
 	}
 
 	@Bean
-	public JobOperatorFactoryBean jobOperator(JobRepository jobRepository) {
-		JobOperatorFactoryBean jobOperatorFactoryBean = new JobOperatorFactoryBean();
-		jobOperatorFactoryBean.setJobRepository(jobRepository);
-		jobOperatorFactoryBean.setTaskExecutor(new SimpleAsyncTaskExecutor());
-		return jobOperatorFactoryBean;
+	public AsyncTaskExecutor asyncTaskExecutor() {
+		ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+		executor.setCorePoolSize(5);
+		executor.setMaxPoolSize(8);
+		executor.setThreadNamePrefix("batch-thread-");
+		executor.afterPropertiesSet();
+		return executor;
 	}
 
 	@Bean
+	public SynchronizedItemStreamReader<CustomerEntity> synchronizedReader() {
+		return new SynchronizedItemStreamReader<CustomerEntity>(reader());
+	}
+
 	public FlatFileItemReader<CustomerEntity> reader() {
 		var itemReader = new FlatFileItemReader<>(lineMapper());
 		itemReader.setResource(new FileSystemResource("src/main/resources/customers.csv"));
@@ -84,12 +92,21 @@ public class SpringBatchConfig {
 	public Step customerFirstStep(JobRepository jobRepository,
 																PlatformTransactionManager transactionManager,
 																CustomerJdbcRepository customerJdbcRepository) {
-		return new StepBuilder(jobRepository)
-						.<CustomerEntity, CustomerEntity>chunk(10).transactionManager(transactionManager)
-						.reader(reader())
-						.processor(processor())
-						.writer(writer(customerJdbcRepository))
-						.build();
+
+		return new StepBuilder("customerFirstStep", jobRepository)
+			.<CustomerEntity, CustomerEntity>chunk(10)
+			.transactionManager(transactionManager)
+
+			.reader(synchronizedReader())
+			.processor(processor())
+			.writer(writer(customerJdbcRepository))
+
+			.faultTolerant()
+			.skip(FlatFileParseException.class)
+			.skip(Exception.class)
+			.skipLimit(50)
+			.taskExecutor(asyncTaskExecutor())
+			.build();
 	}
 
 }

@@ -14,7 +14,9 @@ spring:
     banner-mode: off
   sql:
     init:
-      mode: always
+      # Mude para always na primeira run, para gerar as tabelas de log (mude para never após isso)
+      # Cria as tabelas automaticamente localmente, gere o sql das tabelas criadas e cole eles na pasta de migrations (ambiente alto apenas por migrations)
+      mode: never
       # Força a execução do script oficial de tabelas do Spring Batch para o Postgres
       schema-locations: classpath:org/springframework/batch/core/schema-postgresql.sql
   servlet:
