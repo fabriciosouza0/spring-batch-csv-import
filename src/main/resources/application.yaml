@@ -1,0 +1,32 @@
+server:
+  port: 8080
+  compression:
+    enabled: true
+    mime-types: application/json
+    min-response-size: 2MB
+
+spring:
+  application:
+    name: spring-batch-csv-import
+  main:
+    allow-bean-definition-overriding: true
+    web-application-type: servlet
+    banner-mode: off
+  batch:
+    job:
+      enabled: false
+  servlet:
+    multipart:
+      max-file-size: 1024MB
+      max-request-size: 1024MB
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/${spring.application.name}
+    username: postgres
+    password: postgres
+
+logging:
+  level:
+    root: info
+    br.ativosdigital.tributalizaapi.repository.http.apibrasil.cnpj.CnpjApiRepository: DEBUG
+    feign: DEBUG
